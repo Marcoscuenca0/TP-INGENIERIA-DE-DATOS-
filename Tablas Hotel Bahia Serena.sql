@@ -1,4 +1,5 @@
---create database HotelBahiaSerena;
+-- create database HotelBahiaSerena;
+CREATE DATABASE HotelBahiaSerena;
 
 use HotelBahiaSerena;
 
@@ -113,8 +114,7 @@ CREATE TABLE RESERVA (
   saldo                   DECIMAL(12,2) NOT NULL DEFAULT (0),
   CONSTRAINT CK_RESERVA_fechas CHECK (check_in <= check_out),
   CONSTRAINT FK_RESERVA_cli FOREIGN KEY (id_cliente) REFERENCES CLIENTE(id_cliente),
-  CONSTRAINT FK_RESERVA_hab FOREIGN KEY (id_hab)     REFERENCES HABITACION(id_hab),
-  CONSTRAINT UQ_RESERVA_antiDup UNIQUE (id_cliente, id_hab, check_in)
+  CONSTRAINT FK_RESERVA_hab FOREIGN KEY (id_hab)     REFERENCES HABITACION(id_hab)
 );
 GO
 
@@ -161,11 +161,11 @@ GO
 -- CLIENTES
 INSERT INTO dbo.CLIENTE (nombre, apellido, email, telefono, doc_tipo, doc_nro, estado)
 VALUES 
-('Ana',  'García',  'ana.garcia@mail.com',  '1155550001', 'DNI', '30111222', 'Activo'),
-('Bruno','Pérez',   'bruno.perez@mail.com', '1155550002', 'DNI', '28999888', 'Activo'),
-('Carla','López',   'carla.lopez@mail.com', '1155550003', 'DNI', '27666111', 'Inactivo');
+('Ana',  'GarcÃ­a',  'ana.garcia@mail.com',  '1155550001', 'DNI', '30111222', 'Activo'),
+('Bruno','PÃ©rez',   'bruno.perez@mail.com', '1155550002', 'DNI', '28999888', 'Activo'),
+('Carla','LÃ³pez',   'carla.lopez@mail.com', '1155550003', 'DNI', '27666111', 'Inactivo');
 
--- CATEGORÍAS
+-- CATEGORÃAS
 INSERT INTO dbo.CATEGORIA (categoria, capacidad)
 VALUES 
 ('Estandar', 2),
@@ -188,7 +188,7 @@ VALUES
 ('Media', '2025-11-01', '2025-12-14'),
 ('Baja',  '2025-03-01', '2025-10-31');
 
--- TARIFAS por CATEGORÍA y TEMPORADA (simples)
+-- TARIFAS por CATEGORÃA y TEMPORADA (simples)
 -- Estandar
 INSERT INTO dbo.TARIFA_CAT_TEMP (id_categoria, id_temp, precio_noche)
 SELECT 1, id_temp, CASE nombre WHEN 'Alta' THEN 90000 WHEN 'Media' THEN 70000 ELSE 50000 END
@@ -210,9 +210,9 @@ VALUES
 ('Spa',           'Acceso al circuito de aguas', 15000, 30000, 1),
 ('Traslado',      'Aeropuerto-Hotel',             8000,  15000, 1),
 ('Desayuno',      'Desayuno buffet',              3000,   6000, 1),
-('Late Check-out','Extensión hasta 18hs',        10000,  20000, 1);
+('Late Check-out','ExtensiÃ³n hasta 18hs',        10000,  20000, 1);
 
--- CUPO por día (ejemplos)
+-- CUPO por dÃ­a (ejemplos)
 -- Spa: 10 cupos el 2025-11-10 y 2025-11-11
 INSERT INTO dbo.CUPO_SERVICIO_DIA (id_servicio, fecha, cupo_max)
 SELECT id_servicio, '2025-11-10', 10 FROM dbo.SERVICIO WHERE nombre='Spa';
@@ -226,4 +226,50 @@ SELECT id_servicio, '2025-11-10', 50 FROM dbo.SERVICIO WHERE nombre='Desayuno';
 -- MEDIOS DE PAGO
 INSERT INTO dbo.MEDIO_PAGO (nombre)
 VALUES ('Efectivo'), ('Tarjeta'), ('Transferencia');
-DROP DATABASE HotelBahiaSerena;
+
+--TRIGGER EVITA CREAR NUEVOS DUPLICADOS
+GO
+CREATE TRIGGER trg_RESERVA
+ON dbo.RESERVA
+AFTER INSERT
+AS
+BEGIN
+	IF EXISTS (
+	SELECT 1
+	FROM inserted i
+	JOIN dbo.RESERVA r
+	ON r.id_cliente = i.id_cliente
+	AND r.id_hab = i.id_hab
+	AND r.check_in = i.check_in
+	AND r.id_reserva <> i.id_reserva
+	)
+	BEGIN
+		RAISERROR ('Error de duplicados', 16,1);
+		ROLLBACK TRANSACTION;
+	END
+END;
+GO
+
+--TRIGGER EVITA CREAR DUPLICADOS POR EDICION
+GO
+CREATE TRIGGER trg_RESERVA2
+ON dbo.RESERVA
+AFTER UPDATE
+AS
+BEGIN
+	IF EXISTS (
+	SELECT 1
+	FROM inserted i
+	JOIN dbo.RESERVA r
+	ON r.id_cliente = i.id_cliente
+	AND r.id_hab = i.id_hab
+	AND r.check_in = i.check_in
+	AND r.id_reserva <> i.id_reserva
+	)
+	BEGIN
+		RAISERROR ('Error de duplicados', 16,1);
+		ROLLBACK TRANSACTION;
+	END
+END;
+GO
+
