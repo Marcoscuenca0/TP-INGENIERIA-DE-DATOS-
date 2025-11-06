@@ -1,116 +1,36 @@
-USE HotelBahiaSerena;
+--FunciÃ³n escalar que permite calcular el margen precio-costo de un servicio 
+CREATE OR ALTER FUNCTION calcularMargen (@servicio VARCHAR(50))--Indicamos nombre del servicio a calcular.
+RETURNS DECIMAL(10, 2) AS
+BEGIN
+â€“DeclaraciÃ³n de variables
+	DECLARE @margen DECIMAL (10,2);
+	DECLARE @costo DECIMAL (10,2);
+	DECLARE @precio DECIMAL (10,2);
+â€“Le asignamos a la variable el valor de la columna que coincida con el nombre del servicio.
+	SELECT @costo = ISNULL(costo, 0) FROM SERVICIO WHERE nombre = @servicio;
+	SELECT @precio = ISNULL(precio, 0) FROM SERVICIO WHERE nombre = @servicio;
+â€“Le asignamos a margen el resultado de precio-costo
+	SELECT @margen = @precio - @costo;
+	
+	RETURN @margen;
+END;
 GO
 
--- Crear o modificar el procedimiento
-CREATE OR ALTER PROCEDURE RegistrarReserva
--- Datos solicitados
-    @id_cliente INT,
-    @id_hab INT,
-    @check_in DATE,
-    @check_out DATE
-AS
-BEGIN
-    SET NOCOUNT ON;
+â€“Testeo de la funcion escalar calcularMargen.
+SELECT * FROM SERVICIO;
+SELECT dbo.calcularMargen('Spa') AS "Margen Spa";
+SELECT dbo.calcularMargen('Traslado') AS "Margen Traslado";
+SELECT dbo.calcularMargen('Desayuno') AS "Margen Desayuno";
+SELECT dbo.calcularMargen('Late Check-out') AS "Margen Late Check-out";
+GO
 
-    DECLARE 
-    -- Datos intermedios
-        @estado_cliente VARCHAR(15),
-        @estado_hab VARCHAR(15),
-        @id_categoria INT,
-        @id_temp INT,
-        @precio_noche DECIMAL(12,2),
-        @noches INT,
-        @subtotal DECIMAL(12,2);
+â€“-View que nos permite ver una tabla con reservas de habitaciones que estÃ©n repetidas.
+--AVISO: Para que esto funcione, se debe de borrar el constraint de UniqueID dentro de reservas.
+CREATE OR ALTER VIEW habitacionesRepetidas AS
+SELECT r.id_cliente, c.nombre, r.id_hab, r.check_in, COUNT(*) AS vecesRepetidas â€“Seleccionamos id del cliente, nombre, id de la habitaciÃ³n y date del check-in y creamos un contador para las veces que aparece repetida la reserva.
 
-    -- Checkear existencia del cliente o que este activo
-    SELECT @estado_cliente = estado
-    FROM CLIENTE
-    WHERE id_cliente = @id_cliente;
-
-    IF @estado_cliente IS NULL
-    BEGIN
-        PRINT 'Error: el cliente no existe';
-        RETURN;
-    END;
-
-    IF @estado_cliente <> 'Activo'
-    BEGIN
-        PRINT 'Error: el cliente no está activo.';
-        RETURN;
-    END;
-
-    -- Ver que la habitación exista
-    SELECT @estado_hab = estado, @id_categoria = id_categoria
-    FROM HABITACION
-    WHERE id_hab = @id_hab;
-
-    IF @estado_hab IS NULL
-    BEGIN
-        PRINT 'Error: la habitación no existe.';
-        RETURN;
-    END;
-
-    -- Ver si la habitación esta disponible
-    IF @estado_hab <> 'Disponible'
-    BEGIN
-        PRINT 'Error: la habitación no está disponible.';
-        RETURN;
-    END;
-
-    -- Evitar que la reserva se duplique
-    IF EXISTS (
-        SELECT 1 
-        FROM RESERVA
-        WHERE id_cliente = @id_cliente
-          AND id_hab = @id_hab
-          AND check_in = @check_in
-    ) -- Busca una reserva que cumpla las mismas caracteristicas (id cliente, id de habitacion y fecha de check-in)
-    BEGIN
-        PRINT 'Error: la reserva ya existe y no fue creada para evitar duplicadas.';
-        RETURN;
-    END;
-
-    -- Revisa que exista una temporada valida para poder calcular más tarde el valor de la reserva.
-    SELECT TOP 1 @id_temp = id_temp
-    FROM TEMPORADA
-    WHERE @check_in BETWEEN fecha_desde AND fecha_hasta;
-
-    IF @id_temp IS NULL
-    BEGIN
-        PRINT 'Error: no existe temporada valida para esa fecha.';
-        RETURN;
-    END;
-
-    -- Revisar y buscar la tarifa que aplica a la categoria de habitación y la temporada de la reserva.
-    SELECT TOP 1 @precio_noche = precio_noche
-    FROM TARIFA_CAT_TEMP
-    WHERE id_categoria = @id_categoria AND id_temp = @id_temp;
-
-    IF @precio_noche IS NULL
-    BEGIN
-        PRINT 'Error: no existe tarifa para esa categoría en la temporada.';
-        RETURN;
-    END;
-
-    -- Calcular noches y subtotal
-    SET @noches = DATEDIFF(DAY, @check_in, @check_out);
-    SET @subtotal = @precio_noche * @noches;
-
-    -- Insertar en la tabla reserva una nueva fila con los datos proporcionados
-    INSERT INTO RESERVA (
-        id_cliente, id_hab, fecha_reserva, check_in, check_out,
-        precio_noche_aplicado, noches, subtotal_habitacion, total, estado
-    ) -- Datos que van en una reserva
-    VALUES (
-        @id_cliente, @id_hab, SYSDATETIME(), @check_in, @check_out,
-        @precio_noche, @noches, @subtotal, @subtotal, 'Activa'
-    ); -- Datos tomados que iran en la tabla
-
-    -- Actualizar habitación para que no aparezca disponible
-    UPDATE HABITACION
-    SET estado = 'FueraServicio'
-    WHERE id_hab = @id_hab;
-
-    PRINT 'Reserva registrada correctamente.';
-END;
+FROM RESERVA r
+JOIN CLIENTE c ON r.id_cliente = c.id_cliente --Buscamos por id_cliente 
+GROUP BY r.id_cliente, c.nombre, r.id_hab, r.check_in --Agrupamos por valores identicos
+HAVING COUNT(*) > 1; --Si aparecen mas de una vez, los mostrara en la tabla.
 GO
