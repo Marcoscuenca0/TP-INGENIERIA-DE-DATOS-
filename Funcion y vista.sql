@@ -8,8 +8,8 @@ BEGIN
     DECLARE @precio DECIMAL (10,2);
 
     -- Le asignamos a las variables el valor de la columna que coincida con el nombre del servicio.
-    SELECT @costo = ISNULL(costo, 0) FROM SERVICIO WHERE nombre = @servicio;
-    SELECT @precio = ISNULL(precio, 0) FROM SERVICIO WHERE nombre = @servicio;
+    SELECT @costo = ISNULL(costo, 0) FROM SERVICIO WHERE servicio = @servicio;
+    SELECT @precio = ISNULL(precio, 0) FROM SERVICIO WHERE servicio = @servicio;
 
     -- Le asignamos a margen el resultado de precio - costo
     SELECT @margen = @precio - @costo;
@@ -40,3 +40,4 @@ JOIN CLIENTE c ON r.id_cliente = c.id_cliente -- Buscamos por id_cliente
 GROUP BY r.id_cliente, c.nombre, r.id_hab, r.check_in -- Agrupamos por valores idénticos
 HAVING COUNT(*) > 1; -- Si aparecen más de una vez, los mostrará en la tabla.
 GO
+
