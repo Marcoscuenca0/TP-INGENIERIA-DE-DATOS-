@@ -1,5 +1,3 @@
--- create database HotelBahiaSerena;
-CREATE DATABASE HotelBahiaSerena;
 
 use HotelBahiaSerena;
 
@@ -12,22 +10,21 @@ CREATE TABLE CLIENTE (
   doc_tipo         NVARCHAR(15)  NOT NULL,
   doc_nro          NVARCHAR(30)  NOT NULL,
   estado           VARCHAR(10)   NOT NULL
-                CHECK (estado IN ('Activo','Inactivo')),
+                CHECK (estado IN ('Activo','Inactivo'))
 );
 GO
 
--- Categotias
+-- Categorias
 CREATE TABLE CATEGORIA (
   id_categoria   INT IDENTITY(1,1) PRIMARY KEY,
-  categoria      NVARCHAR(40) NOT NULL,      -- Estandar / Superior / Suite
-  capacidad      INT NOT NULL CHECK (capacidad > 0)
+  categoria      NVARCHAR(40) NOT NULL      -- Estandar / Superior / Suite
+  
 );
 GO
 
 -- Habitaciones
 CREATE TABLE HABITACION (
   id_hab        INT IDENTITY(1,1) PRIMARY KEY,
-  codigo_unico  NVARCHAR(30) NOT NULL,
   id_categoria  INT NOT NULL,
   piso          INT NOT NULL,
   vista         NVARCHAR(20) NOT NULL,       -- Mar/Jardin/Interna...
@@ -55,45 +52,38 @@ GO
 -- Temporada
 CREATE TABLE TEMPORADA (
   id_temp      INT IDENTITY(1,1) PRIMARY KEY,
-  nombre       NVARCHAR(30) NOT NULL,    -- Alta / Media / Baja
+  temporada       NVARCHAR(30) NOT NULL,    -- Alta / Media / Baja
   fecha_desde  DATE NOT NULL,
   fecha_hasta  DATE NOT NULL,
   CONSTRAINT CK_TEMPORADA_rango CHECK (fecha_desde <= fecha_hasta)
 );
 GO
 
+
 -- Tarifa por Temporada y Categoria
 CREATE TABLE TARIFA_CAT_TEMP (
   id_tarifa     INT IDENTITY(1,1) PRIMARY KEY,
   id_categoria  INT NOT NULL,
   id_temp       INT NOT NULL,
-  precio_noche  DECIMAL(12,2) NOT NULL CHECK (precio_noche >= 0),
+  tarifa_noche  DECIMAL(12,2) NOT NULL CHECK (tarifa_noche >= 0),
+
   CONSTRAINT FK_TARIFA_cat  FOREIGN KEY (id_categoria) REFERENCES CATEGORIA(id_categoria),
   CONSTRAINT FK_TARIFA_temp FOREIGN KEY (id_temp)      REFERENCES TEMPORADA(id_temp),
   CONSTRAINT UQ_TARIFA_cat_temp UNIQUE (id_categoria, id_temp)
 );
 GO
 
--- Sercios Adicionales 
+--Servicios adicionales
 CREATE TABLE SERVICIO (
   id_servicio   INT IDENTITY(1,1) PRIMARY KEY,
-  nombre        NVARCHAR(60) NOT NULL,
-  descripcion   NVARCHAR(200) NULL,
+  servicio      NVARCHAR(60) NOT NULL,
   costo         DECIMAL(12,2) NOT NULL CHECK (costo >= 0),
   precio        DECIMAL(12,2) NOT NULL CHECK (precio >= 0),
+  cupo_diario   INT NOT NULL CHECK (cupo_diario >= 0),
   activo        BIT NOT NULL DEFAULT (1)
 );
 GO
 
--- Cupo de Servicios por Dia
-CREATE TABLE CUPO_SERVICIO_DIA (
-  id_cupo      INT IDENTITY(1,1) PRIMARY KEY,
-  id_servicio  INT NOT NULL,
-  fecha        DATE NOT NULL,
-  cupo_max     INT  NOT NULL CHECK (cupo_max >= 0),
-  CONSTRAINT FK_CUPO_serv  FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio),
-);
-GO
 
 -- Reserva
 CREATE TABLE RESERVA (
@@ -118,6 +108,33 @@ CREATE TABLE RESERVA (
 );
 GO
 
+
+-- Tabla CUPO_SERVICIO_DIA
+CREATE TABLE CUPO_SERVICIO_DIA (
+  id_cupo_servicio_reserva INT IDENTITY(1,1) PRIMARY KEY,
+  id_reserva   INT NOT NULL,
+  id_servicio  INT NOT NULL,
+  CONSTRAINT FK_CUPO_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva),
+  CONSTRAINT FK_CUPO_servicio FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio)
+);
+GO
+
+CREATE TABLE RESERVA_HABITACION (
+  id_res_hab INT IDENTITY(1,1) PRIMARY KEY,
+  id_reserva INT NOT NULL,
+  id_hab INT NOT NULL,
+  fecha_checkin DATE NOT NULL,
+  fecha_checkout DATE NOT NULL,
+  precio_noche DECIMAL(12,2) NOT NULL CHECK (precio_noche >= 0),
+  noches INT NOT NULL CHECK (noches >= 0),
+  subtotal DECIMAL(12,2) NOT NULL CHECK (subtotal >= 0),
+  CONSTRAINT FK_RESHAB_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva),
+  CONSTRAINT FK_RESHAB_hab FOREIGN KEY (id_hab) REFERENCES HABITACION(id_hab)
+);
+GO
+
+
+
 -- Tabla intermedia entre Reserva y Servicio
 CREATE TABLE RESERVA_SERVICIO (
   id_reserva            INT NOT NULL,
@@ -132,25 +149,45 @@ CREATE TABLE RESERVA_SERVICIO (
 );
 GO
 
--- Medios de Pago
-CREATE TABLE dbo.MEDIO_PAGO (
-  id_medio       INT IDENTITY(1,1) PRIMARY KEY,
-  nombre         NVARCHAR(40) NOT NULL,     -- Efectivo/Tarjeta/Transferencia
+CREATE TABLE FACTURA (
+  id_factura INT IDENTITY(1,1) PRIMARY KEY,
+  id_reserva INT NULL,
+  id_cliente_factura INT NOT NULL,
+  fecha_emision DATETIME2(0) NOT NULL DEFAULT (SYSUTCDATETIME()),
+  nro_comprobante NVARCHAR(30) NOT NULL,
+  moneda CHAR(3) NOT NULL DEFAULT ('ARS'),
+  total_facturado DECIMAL(12,2) NOT NULL CHECK (total_facturado >= 0),
+  estado VARCHAR(20) NOT NULL CHECK (estado IN ('Borrador','Emitida','Anulada','PagadaParcial','PagadaTotal')),
+  CONSTRAINT FK_FACTURA_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva),
+  CONSTRAINT FK_FACTURA_cliente FOREIGN KEY (id_cliente_factura) REFERENCES CLIENTE(id_cliente),
+  CONSTRAINT UQ_FACTURA_nro UNIQUE (nro_comprobante)
 );
 GO
 
--- Pago
-CREATE TABLE PAGO (
-  id_pago        INT IDENTITY(1,1) PRIMARY KEY,
-  id_reserva     INT NOT NULL,
-  id_medio       INT NOT NULL,
-  fecha          DATETIME2(0) NOT NULL,
-  monto          DECIMAL(12,2) NOT NULL CHECK (monto <> 0),
-  moneda         CHAR(3) NOT NULL DEFAULT ('ARS'),
-  estado         VARCHAR(10) NOT NULL
-                 CHECK (estado IN ('Pendiente','Aprobado','Rechazado')),
-  CONSTRAINT FK_PAGO_res   FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva),
-  CONSTRAINT FK_PAGO_medio FOREIGN KEY (id_medio)   REFERENCES MEDIO_PAGO(id_medio)
+CREATE TABLE FACTURA_DETALLE (
+  id_detalle INT IDENTITY(1,1) PRIMARY KEY,
+  id_factura INT NOT NULL,
+  id_reserva INT NULL,
+  id_res_hab INT NULL,
+  id_servicio INT NULL,
+  descripcion NVARCHAR(200) NOT NULL,
+  cantidad INT NOT NULL CHECK (cantidad > 0),
+  precio_unit DECIMAL(12,2) NOT NULL CHECK (precio_unit >= 0),
+  subtotal AS (CAST(cantidad AS DECIMAL(12,2)) * precio_unit) PERSISTED,
+  CONSTRAINT FK_DET_factura FOREIGN KEY (id_factura) REFERENCES FACTURA(id_factura),
+  CONSTRAINT FK_DET_reserva FOREIGN KEY (id_reserva) REFERENCES RESERVA(id_reserva),
+  CONSTRAINT FK_DET_reshab FOREIGN KEY (id_res_hab) REFERENCES RESERVA_HABITACION(id_res_hab),
+  CONSTRAINT FK_DET_servicio FOREIGN KEY (id_servicio) REFERENCES SERVICIO(id_servicio)
+);
+GO
+
+CREATE TABLE ALERTA (
+  id_alerta INT IDENTITY(1,1) PRIMARY KEY,
+  id_hab INT NOT NULL,
+  fecha_alerta DATETIME DEFAULT(GETDATE()),
+  estado NVARCHAR(15),
+  mensaje NVARCHAR(200),
+  CONSTRAINT FK_ALERTA_hab FOREIGN KEY (id_hab) REFERENCES HABITACION(id_hab)
 );
 GO
 
@@ -159,85 +196,73 @@ USE HotelBahiaSerena;
 GO
 
 -- CLIENTES
-INSERT INTO dbo.CLIENTE (nombre, apellido, email, telefono, doc_tipo, doc_nro, estado)
+INSERT INTO CLIENTE (nombre, apellido, email, telefono, doc_tipo, doc_nro, estado)
 VALUES 
-('Ana',  'García',  'ana.garcia@mail.com',  '1155550001', 'DNI', '30111222', 'Activo'),
-('Bruno','Pérez',   'bruno.perez@mail.com', '1155550002', 'DNI', '28999888', 'Activo'),
-('Carla','López',   'carla.lopez@mail.com', '1155550003', 'DNI', '27666111', 'Inactivo');
+('Ana',  'Garcia',  'ana.garcia@mail.com',  '1155550001', 'DNI', '30111222', 'Activo'),
+('Bruno','Perez',   'bruno.perez@mail.com', '1155550002', 'DNI', '28999888', 'Activo'),
+('Carla','Lopez',   'carla.lopez@mail.com', '1155550003', 'DNI', '27666111', 'Inactivo');
 
--- CATEGORÍAS
-INSERT INTO dbo.CATEGORIA (categoria, capacidad)
+-- CATEGORIAS
+INSERT INTO CATEGORIA (categoria)
 VALUES 
-('Estandar', 2),
-('Superior', 3),
-('Suite',    4);
+('Estandar'),
+('Superior'),
+('Suite');
 
 -- HABITACIONES (una fuera de servicio para probar)
-INSERT INTO dbo.HABITACION (codigo_unico, id_categoria, piso, vista, estado)
+INSERT INTO HABITACION (id_categoria, piso, vista, estado)
 VALUES
-('101A', 1, 1, 'Mar',     'Disponible'),
-('102B', 1, 1, 'Jardin',  'Disponible'),
-('201C', 2, 2, 'Interna', 'Disponible'),
-('202D', 2, 2, 'Mar',     'Disponible'),
-('301E', 3, 3, 'Mar',     'FueraServicio');
+( 1, 1, 'Mar',     'Disponible'),
+( 1, 1, 'Jardin',  'Disponible'),
+( 2, 2, 'Interna', 'Disponible'),
+( 2, 2, 'Mar',     'Disponible'),
+(3, 3, 'Mar',     'FueraServicio');
 
 -- TEMPORADAS (ajustadas para cubrir noviembre/diciembre 2025)
-INSERT INTO dbo.TEMPORADA (nombre, fecha_desde, fecha_hasta)
+INSERT INTO TEMPORADA (temporada, fecha_desde, fecha_hasta)
 VALUES
 ('Alta',  '2025-12-15', '2026-02-28'),
 ('Media', '2025-11-01', '2025-12-14'),
 ('Baja',  '2025-03-01', '2025-10-31');
 
--- TARIFAS por CATEGORÍA y TEMPORADA (simples)
+-- TARIFAS por CATEGORIA y TEMPORADA (simples)
 -- Estandar
-INSERT INTO dbo.TARIFA_CAT_TEMP (id_categoria, id_temp, precio_noche)
-SELECT 1, id_temp, CASE nombre WHEN 'Alta' THEN 90000 WHEN 'Media' THEN 70000 ELSE 50000 END
-FROM dbo.TEMPORADA;
+INSERT INTO TARIFA_CAT_TEMP (id_categoria, id_temp, tarifa_noche)
+SELECT 1, id_temp, 
+       CASE temporada WHEN 'Alta' THEN 90000 WHEN 'Media' THEN 70000 ELSE 50000 END
+FROM TEMPORADA;
 
 -- Superior
-INSERT INTO dbo.TARIFA_CAT_TEMP (id_categoria, id_temp, precio_noche)
-SELECT 2, id_temp, CASE nombre WHEN 'Alta' THEN 120000 WHEN 'Media' THEN 95000 ELSE 75000 END
-FROM dbo.TEMPORADA;
-
+INSERT INTO TARIFA_CAT_TEMP (id_categoria, id_temp, tarifa_noche)
+SELECT 2, id_temp,
+       CASE temporada WHEN 'Alta' THEN 120000 WHEN 'Media' THEN 95000 ELSE 75000 END
+FROM TEMPORADA;
 -- Suite
-INSERT INTO dbo.TARIFA_CAT_TEMP (id_categoria, id_temp, precio_noche)
-SELECT 3, id_temp, CASE nombre WHEN 'Alta' THEN 180000 WHEN 'Media' THEN 140000 ELSE 110000 END
-FROM dbo.TEMPORADA;
+INSERT INTO TARIFA_CAT_TEMP (id_categoria, id_temp, tarifa_noche)
+SELECT 3, id_temp,
+       CASE temporada WHEN 'Alta' THEN 180000 WHEN 'Media' THEN 140000 ELSE 110000 END
+FROM TEMPORADA;
 
 -- SERVICIOS
-INSERT INTO dbo.SERVICIO (nombre, descripcion, costo, precio, activo)
+INSERT INTO SERVICIO (servicio, costo, precio, cupo_diario, activo)
 VALUES
-('Spa',           'Acceso al circuito de aguas', 15000, 30000, 1),
-('Traslado',      'Aeropuerto-Hotel',             8000,  15000, 1),
-('Desayuno',      'Desayuno buffet',              3000,   6000, 1),
-('Late Check-out','Extensión hasta 18hs',        10000,  20000, 1);
+('Spa', 15000, 30000, 10, 1),
+('Traslado', 8000, 15000, 20, 1),
+('Desayuno', 3000, 6000, 50, 1),
+('Late Check-out', 10000, 20000, 5, 1);
 
--- CUPO por día (ejemplos)
--- Spa: 10 cupos el 2025-11-10 y 2025-11-11
-INSERT INTO dbo.CUPO_SERVICIO_DIA (id_servicio, fecha, cupo_max)
-SELECT id_servicio, '2025-11-10', 10 FROM dbo.SERVICIO WHERE nombre='Spa';
-INSERT INTO dbo.CUPO_SERVICIO_DIA (id_servicio, fecha, cupo_max)
-SELECT id_servicio, '2025-11-11', 10 FROM dbo.SERVICIO WHERE nombre='Spa';
-
--- Desayuno suele ser amplio (50)
-INSERT INTO dbo.CUPO_SERVICIO_DIA (id_servicio, fecha, cupo_max)
-SELECT id_servicio, '2025-11-10', 50 FROM dbo.SERVICIO WHERE nombre='Desayuno';
-
--- MEDIOS DE PAGO
-INSERT INTO dbo.MEDIO_PAGO (nombre)
-VALUES ('Efectivo'), ('Tarjeta'), ('Transferencia');
 
 --TRIGGER EVITA CREAR NUEVOS DUPLICADOS
 GO
 CREATE TRIGGER trg_RESERVA
-ON dbo.RESERVA
+ON RESERVA
 AFTER INSERT
 AS
 BEGIN
 	IF EXISTS (
 	SELECT 1
 	FROM inserted i
-	JOIN dbo.RESERVA r
+	JOIN RESERVA r
 	ON r.id_cliente = i.id_cliente
 	AND r.id_hab = i.id_hab
 	AND r.check_in = i.check_in
@@ -253,14 +278,14 @@ GO
 --TRIGGER EVITA CREAR DUPLICADOS POR EDICION
 GO
 CREATE TRIGGER trg_RESERVA2
-ON dbo.RESERVA
+ON RESERVA
 AFTER UPDATE
 AS
 BEGIN
 	IF EXISTS (
 	SELECT 1
 	FROM inserted i
-	JOIN dbo.RESERVA r
+	JOIN RESERVA r
 	ON r.id_cliente = i.id_cliente
 	AND r.id_hab = i.id_hab
 	AND r.check_in = i.check_in
@@ -272,4 +297,3 @@ BEGIN
 	END
 END;
 GO
-
