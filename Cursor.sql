@@ -1,16 +1,6 @@
 use HotelBahiaSerena
 go
 
-select * from HABITACION
-CREATE TABLE ALERTA (
-  id_alerta INT IDENTITY(1,1) PRIMARY KEY,
-  id_hab INT NOT NULL,
-  fecha_alerta DATETIME DEFAULT(GETDATE()),
-  estado NVARCHAR(15),
-  mensaje NVARCHAR(200),
-  CONSTRAINT FK_ALERTA_hab FOREIGN KEY (id_hab) REFERENCES HABITACION(id_hab)
-);
-GO
 CREATE OR ALTER PROCEDURE GenerarAlertasHabitaciones
 AS
 BEGIN
@@ -38,7 +28,7 @@ BEGIN
     BEGIN
         IF (@estado = 'FueraServicio')
         BEGIN
-            -- Inserta solo si la alerta NO se registró ya
+            -- Inserta solo si la alerta NO se registrÃ³ ya
             IF NOT EXISTS (
                 SELECT 1
                 FROM ALERTA
@@ -47,15 +37,14 @@ BEGIN
             )
             BEGIN
                 INSERT INTO ALERTA (id_hab, estado, mensaje)
-                VALUES (@id_hab, @estado, 'Habitación fuera de servicio detectada');
+                VALUES (@id_hab, @estado, 'HabitaciÃ³n fuera de servicio detectada');
             END
         END;
 
         FETCH NEXT FROM hab_cursor INTO @id_hab, @estado;
     END;
 
-    --CLOSE hab_cursor;
-    --DEALLOCATE hab_cursor;
+    CLOSE hab_cursor;
+    DEALLOCATE hab_cursor;
 END
 GO
-SELECT * FROM ALERTA
