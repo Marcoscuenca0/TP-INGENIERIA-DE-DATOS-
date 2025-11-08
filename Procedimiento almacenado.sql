@@ -1,6 +1,7 @@
 USE HotelBahiaSerena;
 GO
 
+
 -- Crear o modificar el procedimiento
 CREATE OR ALTER PROCEDURE RegistrarReserva
 -- Datos solicitados
@@ -35,25 +36,25 @@ BEGIN
 
     IF @estado_cliente <> 'Activo'
     BEGIN
-        PRINT 'Error: el cliente no est· activo.';
+        PRINT 'Error: el cliente no est√° activo.';
         RETURN;
     END;
 
-    -- Ver que la habitaciÛn exista
+    -- Ver que la habitaci√≥n exista
     SELECT @estado_hab = estado, @id_categoria = id_categoria
     FROM HABITACION
     WHERE id_hab = @id_hab;
 
     IF @estado_hab IS NULL
     BEGIN
-        PRINT 'Error: la habitaciÛn no existe.';
+        PRINT 'Error: la habitaci√≥n no existe.';
         RETURN;
     END;
 
-    -- Ver si la habitaciÛn esta disponible
+    -- Ver si la habitaci√≥n esta disponible
     IF @estado_hab <> 'Disponible'
     BEGIN
-        PRINT 'Error: la habitaciÛn no est· disponible.';
+        PRINT 'Error: la habitaci√≥n no est√° disponible.';
         RETURN;
     END;
 
@@ -70,7 +71,7 @@ BEGIN
         RETURN;
     END;
 
-    -- Revisa que exista una temporada valida para poder calcular m·s tarde el valor de la reserva.
+    -- Revisa que exista una temporada valida para poder calcular m√°s tarde el valor de la reserva.
     SELECT TOP 1 @id_temp = id_temp
     FROM TEMPORADA
     WHERE @check_in BETWEEN fecha_desde AND fecha_hasta;
@@ -81,14 +82,14 @@ BEGIN
         RETURN;
     END;
 
-    -- Revisar y buscar la tarifa que aplica a la categoria de habitaciÛn y la temporada de la reserva.
-    SELECT TOP 1 @precio_noche = precio_noche
+    -- Revisar y buscar la tarifa que aplica a la categoria de habitaci√≥n y la temporada de la reserva.
+    SELECT TOP 1 @precio_noche = tarifa_noche
     FROM TARIFA_CAT_TEMP
     WHERE id_categoria = @id_categoria AND id_temp = @id_temp;
 
     IF @precio_noche IS NULL
     BEGIN
-        PRINT 'Error: no existe tarifa para esa categorÌa en la temporada.';
+        PRINT 'Error: no existe tarifa para esa categor√≠a en la temporada.';
         RETURN;
     END;
 
@@ -106,7 +107,7 @@ BEGIN
         @precio_noche, @noches, @subtotal, @subtotal, 'Activa'
     ); -- Datos tomados que iran en la tabla
 
-    -- Actualizar habitaciÛn para que no aparezca disponible
+    -- Actualizar habitaci√≥n para que no aparezca disponible
     UPDATE HABITACION
     SET estado = 'FueraServicio'
     WHERE id_hab = @id_hab;
