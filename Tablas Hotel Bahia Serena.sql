@@ -1,4 +1,4 @@
-
+--create database HotelBahiaSerena;
 use HotelBahiaSerena;
 
 CREATE TABLE CLIENTE (
@@ -297,3 +297,4 @@ BEGIN
 	END
 END;
 GO
+
